@@ -1,0 +1,19 @@
+name: e2e test TestDeployAllInOnePostgresWithMultipleReplica
+
+on:
+  pull_request:
+    branches:
+      - '*'
+  push:
+    branches:
+      - 'issue2670_flaky_e2e'
+  workflow_dispatch: {}
+
+jobs:
+  e2e-postgres-multiple-replica:
+    runs-on: ubuntu-latest
+    steps:
+    - name: run e2e tests
+      run: make test.e2e.allinone.postgres.multiplereplica
+      env:
+        TEST_KONG_CONTROLLER_IMAGE_OVERRIDE: "kong/nightly-ingress-controller:nightly"

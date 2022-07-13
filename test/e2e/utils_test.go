@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/kustomize/api/krusty"
 	"sigs.k8s.io/kustomize/kyaml/filesys"
+
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/metrics"
 )
 
 var (
@@ -319,4 +321,17 @@ func getKubernetesLogs(t *testing.T, env environments.Environment, namespace, na
 		return "", fmt.Errorf("%s", stderr.String())
 	}
 	return string(out), nil
+}
+
+// containMetricConfigPushCount gets metrics from URL and returns true if metrics of config push count is found,
+// which indicate that the instance is the leader.
+func containMetricConfigPushCount(t *testing.T, url string, client *http.Client) bool {
+	req, err := http.NewRequest("GET", url, nil)
+	require.NoError(t, err)
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	return strings.Contains(string(body), metrics.MetricNameConfigPushCount)
 }

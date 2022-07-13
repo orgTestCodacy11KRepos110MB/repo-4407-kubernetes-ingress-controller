@@ -6,10 +6,8 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -24,8 +22,6 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/kong/kubernetes-ingress-controller/v2/internal/metrics"
 )
 
 // -----------------------------------------------------------------------------
@@ -345,15 +341,7 @@ func TestDeployAllInOnePostgresWithMultipleReplicas(t *testing.T) {
 	defer cancel()
 	startPortForwarder(forwardCtx, t, env, secondary.Namespace, secondary.Name, "9777", "cmetrics")
 	require.Never(t, func() bool {
-		req, err := http.NewRequest("GET", "http://localhost:9777/metrics", nil)
-		require.NoError(t, err)
-		resp, err := client.Do(req)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		// if we are not the leader, we run no config pushes, and this metric string will not appear
-		return strings.Contains(string(body), metrics.MetricNameConfigPushCount)
+		return containMetricConfigPushCount(t, "http://localhost:9777/metrics", client)
 	}, time.Minute, time.Second*10)
 
 	t.Log("deleting the original replica and current leader")
@@ -361,16 +349,14 @@ func TestDeployAllInOnePostgresWithMultipleReplicas(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("confirming the second replica becomes the leader and starts pushing configuration")
+
 	require.Eventually(t, func() bool {
-		req, err := http.NewRequest("GET", "http://localhost:9777/metrics", nil)
+		return containMetricConfigPushCount(t, "http://localhost:9777/metrics", client)
+	}, time.Minute, time.Second, func() string {
+		logs, err := getKubernetesLogs(t, env, secondary.Namespace, secondary.Name)
 		require.NoError(t, err)
-		resp, err := client.Do(req)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		return strings.Contains(string(body), metrics.MetricNameConfigPushCount)
-	}, time.Minute, time.Second)
+		return "pod logs of second replica: " + logs
+	}())
 }
 
 const entPostgresPath = "../../deploy/single/all-in-one-postgres-enterprise.yaml"

@@ -298,6 +298,21 @@ test.e2e:
 		-timeout $(E2E_TEST_TIMEOUT) \
 		./test/e2e/...
 
+test.e2e.allinone:
+	GOFLAGS="-tags=e2e_tests" go test -v -count=1\
+		-race -run "^TestDeployAllInOne" \
+		-parallel $(NCPU) \
+		-timeout $(E2E_TEST_TIMEOUT) \
+		./test/e2e/...	
+
+
+test.e2e.allinone.postgres.multiplereplica:
+	GOFLAGS="-tags=e2e_tests" go test -v -count=1\
+		-race -run "^TestDeployAllInOnePostgresWithMultipleReplica" \
+		-parallel $(NCPU) \
+		-timeout 10m \
+		./test/e2e/...	
+
 # ------------------------------------------------------------------------------
 # Operations - Local Deployment
 # ------------------------------------------------------------------------------
