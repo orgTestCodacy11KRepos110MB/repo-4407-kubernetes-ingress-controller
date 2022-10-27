@@ -226,7 +226,7 @@ func setupDataplaneAddressFinder(ctx context.Context, mgrc client.Client, c *Con
 				}
 
 				var addrs []string
-				switch svc.Spec.Type { //nolint:exhaustive
+				switch svc.Spec.Type { 
 				case corev1.ServiceTypeLoadBalancer:
 					for _, lbaddr := range svc.Status.LoadBalancer.Ingress {
 						if lbaddr.IP != "" {

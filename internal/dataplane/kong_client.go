@@ -9,6 +9,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/kong/deck/file"
 	"github.com/kong/go-kong/kong"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -297,7 +298,11 @@ func (c *KongClient) Update(ctx context.Context) error {
 
 	// initialize a parser
 	c.logger.Debug("parsing kubernetes objects into data-plane configuration")
-	p := parser.NewParser(c.logger, storer)
+
+	p, err := parser.NewParser(c.logger, storer)
+	if err != nil {
+		return errors.Wrap(err, "failed to create parser")
+	}
 	formatVersion := "1.1"
 	if c.AreKubernetesObjectReportsEnabled() {
 		p.EnableKubernetesObjectReports()

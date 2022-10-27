@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/kong/go-kong/kong"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
@@ -51,6 +52,7 @@ type Parser struct {
 	featureEnabledCombinedServiceRoutes             bool
 
 	flagEnabledRegexPathPrefix bool
+	errorsCollector            *TranslationErrorsCollector
 }
 
 // NewParser produces a new Parser object provided a logging mechanism
@@ -58,11 +60,17 @@ type Parser struct {
 func NewParser(
 	logger logrus.FieldLogger,
 	storer store.Storer,
-) *Parser {
-	return &Parser{
-		logger: logger,
-		storer: storer,
+) (*Parser, error) {
+	errorsCollector, err := NewTranslationErrorsCollector(logger)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create translation errors collector")
 	}
+
+	return &Parser{
+		logger:          logger,
+		storer:          storer,
+		errorsCollector: errorsCollector,
+	}, nil
 }
 
 // -----------------------------------------------------------------------------
@@ -172,6 +180,10 @@ func (p *Parser) EnableCombinedServiceRoutes() {
 // paths, which require an IngressClass setting.
 func (p *Parser) EnableRegexPathPrefix() {
 	p.flagEnabledRegexPathPrefix = true
+}
+
+func (p *Parser) PopTranslationErrors() []TranslationError {
+	return p.errorsCollector.PopTranslationErrors()
 }
 
 // -----------------------------------------------------------------------------

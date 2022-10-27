@@ -11,6 +11,7 @@ import (
 	"github.com/kong/go-kong/kong"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
@@ -280,7 +281,8 @@ func TestGlobalPlugin(t *testing.T) {
 			},
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(1, len(state.Plugins),
@@ -461,7 +463,8 @@ func TestSecretConfigurationPlugin(t *testing.T) {
 			}
 			store, err := store.NewFakeStore(objects)
 			assert.Nil(err)
-			p := NewParser(logrus.New(), store)
+			p, err := NewParser(logrus.New(), store)
+			require.NoError(t, err)
 			state := p.Build()
 			assert.Nil(err)
 			assert.NotNil(state)
@@ -566,7 +569,8 @@ func TestSecretConfigurationPlugin(t *testing.T) {
 			}
 			store, err := store.NewFakeStore(objects)
 			assert.Nil(err)
-			p := NewParser(logrus.New(), store)
+			p, err := NewParser(logrus.New(), store)
+			require.NoError(t, err)
 			state := p.Build()
 			assert.Nil(err)
 			assert.NotNil(state)
@@ -668,7 +672,8 @@ func TestSecretConfigurationPlugin(t *testing.T) {
 			}
 			store, err := store.NewFakeStore(objects)
 			assert.Nil(err)
-			p := NewParser(logrus.New(), store)
+			p, err := NewParser(logrus.New(), store)
+			require.NoError(t, err)
 			state := p.Build()
 			assert.NotNil(state)
 			assert.Equal(0, len(state.Plugins),
@@ -719,7 +724,8 @@ func TestSecretConfigurationPlugin(t *testing.T) {
 		}
 		store, err := store.NewFakeStore(objects)
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		for _, testcase := range references {
@@ -817,7 +823,8 @@ func TestSecretConfigurationPlugin(t *testing.T) {
 			}
 			store, err := store.NewFakeStore(objects)
 			assert.Nil(err)
-			p := NewParser(logrus.New(), store)
+			p, err := NewParser(logrus.New(), store)
+			require.NoError(t, err)
 			state := p.Build()
 			assert.NotNil(state)
 			assert.Equal(0, len(state.Plugins),
@@ -851,7 +858,8 @@ func TestCACertificate(t *testing.T) {
 			Secrets: secrets,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -901,7 +909,8 @@ func TestCACertificate(t *testing.T) {
 			Secrets: secrets,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -979,7 +988,8 @@ func TestCACertificate(t *testing.T) {
 			Secrets: secrets,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -1062,7 +1072,8 @@ func TestServiceClientCertificate(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(1, len(state.Certificates),
@@ -1129,7 +1140,8 @@ func TestServiceClientCertificate(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(0, len(state.Certificates),
@@ -1189,7 +1201,8 @@ func TestKongRouteAnnotations(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -1268,7 +1281,8 @@ func TestKongRouteAnnotations(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -1348,7 +1362,8 @@ func TestKongRouteAnnotations(t *testing.T) {
 				Services:         services,
 			})
 			assert.Nil(err)
-			p := NewParser(logrus.New(), store)
+			p, err := NewParser(logrus.New(), store)
+			require.NoError(t, err)
 			state := p.Build()
 			assert.NotNil(state)
 
@@ -1429,7 +1444,8 @@ func TestKongRouteAnnotations(t *testing.T) {
 				Services:         services,
 			})
 			assert.Nil(err)
-			p := NewParser(logrus.New(), store)
+			p, err := NewParser(logrus.New(), store)
+			require.NoError(t, err)
 			state := p.Build()
 			assert.NotNil(state)
 
@@ -1509,7 +1525,8 @@ func TestKongRouteAnnotations(t *testing.T) {
 				Services:         services,
 			})
 			assert.Nil(err)
-			p := NewParser(logrus.New(), store)
+			p, err := NewParser(logrus.New(), store)
+			require.NoError(t, err)
 			state := p.Build()
 			assert.NotNil(state)
 
@@ -1589,7 +1606,8 @@ func TestKongRouteAnnotations(t *testing.T) {
 				Services:         services,
 			})
 			assert.Nil(err)
-			p := NewParser(logrus.New(), store)
+			p, err := NewParser(logrus.New(), store)
+			require.NoError(t, err)
 			state := p.Build()
 			assert.NotNil(state)
 
@@ -1669,7 +1687,8 @@ func TestKongRouteAnnotations(t *testing.T) {
 				Services:         services,
 			})
 			assert.Nil(err)
-			p := NewParser(logrus.New(), store)
+			p, err := NewParser(logrus.New(), store)
+			require.NoError(t, err)
 			state := p.Build()
 			assert.NotNil(state)
 
@@ -1749,7 +1768,8 @@ func TestKongRouteAnnotations(t *testing.T) {
 				Services:         services,
 			})
 			assert.Nil(err)
-			p := NewParser(logrus.New(), store)
+			p, err := NewParser(logrus.New(), store)
+			require.NoError(t, err)
 			state := p.Build()
 			assert.NotNil(state)
 
@@ -1829,7 +1849,8 @@ func TestKongRouteAnnotations(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -1907,7 +1928,8 @@ func TestKongRouteAnnotations(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -1985,7 +2007,8 @@ func TestKongRouteAnnotations(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -2045,7 +2068,8 @@ func TestKongProcessClasslessIngress(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -2095,7 +2119,8 @@ func TestKongProcessClasslessIngress(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -2172,7 +2197,8 @@ func TestKnativeIngressAndPlugins(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -2250,7 +2276,8 @@ func TestKnativeIngressAndPlugins(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -2319,7 +2346,8 @@ func TestKnativeIngressAndPlugins(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -2404,7 +2432,8 @@ func TestKnativeIngressAndPlugins(t *testing.T) {
 			KongPlugins:      plugins,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -2514,7 +2543,8 @@ func TestKongServiceAnnotations(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -2596,7 +2626,8 @@ func TestKongServiceAnnotations(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 
@@ -2684,7 +2715,8 @@ func TestKongServiceAnnotations(t *testing.T) {
 				Services:         services,
 			})
 			assert.Nil(err)
-			p := NewParser(logrus.New(), store)
+			p, err := NewParser(logrus.New(), store)
+			require.NoError(t, err)
 			state := p.Build()
 			assert.NotNil(state)
 
@@ -2753,7 +2785,8 @@ func TestDefaultBackend(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(1, len(state.Services),
@@ -2821,7 +2854,8 @@ func TestDefaultBackend(t *testing.T) {
 			Services:         services,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(0, len(state.Certificates),
@@ -2886,7 +2920,8 @@ func TestParserSecret(t *testing.T) {
 			Secrets:          secrets,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(0, len(state.Certificates),
@@ -2967,7 +3002,8 @@ func TestParserSecret(t *testing.T) {
 			Secrets:          secrets,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(1, len(state.Certificates),
@@ -3093,7 +3129,8 @@ func TestParserSecret(t *testing.T) {
 			Secrets:          secrets,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(1, len(state.Certificates),
@@ -3174,7 +3211,8 @@ func TestParserSecret(t *testing.T) {
 			Secrets:          secrets,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(1, len(state.Certificates),
@@ -3256,7 +3294,8 @@ func TestParserSNI(t *testing.T) {
 			Secrets:          secrets,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(kong.Route{
@@ -3320,7 +3359,8 @@ func TestParserSNI(t *testing.T) {
 			IngressesV1beta1: ingresses,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(kong.Route{
@@ -3379,7 +3419,8 @@ func TestParserHostAliases(t *testing.T) {
 			IngressesV1beta1: ingresses,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(kong.Route{
@@ -3431,7 +3472,8 @@ func TestParserHostAliases(t *testing.T) {
 			IngressesV1beta1: ingresses,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(kong.Route{
@@ -3484,7 +3526,8 @@ func TestParserHostAliases(t *testing.T) {
 			IngressesV1beta1: ingresses,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(kong.Route{
@@ -3573,7 +3616,8 @@ func TestPluginAnnotations(t *testing.T) {
 			KongPlugins:      plugins,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(1, len(state.Plugins),
@@ -3670,7 +3714,8 @@ func TestPluginAnnotations(t *testing.T) {
 			KongClusterPlugins: clusterPlugins,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(1, len(state.Plugins),
@@ -3740,7 +3785,8 @@ func TestPluginAnnotations(t *testing.T) {
 			KongClusterPlugins: clusterPlugins,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(1, len(state.Plugins),
@@ -3786,7 +3832,8 @@ func TestPluginAnnotations(t *testing.T) {
 			IngressesV1beta1: ingresses,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(0, len(state.Plugins),
@@ -4582,7 +4629,8 @@ func TestPickPort(t *testing.T) {
 			store, err := store.NewFakeStore(tt.objs)
 			assert.NoError(err)
 
-			p := NewParser(logrus.New(), store)
+			p, err := NewParser(logrus.New(), store)
+			require.NoError(t, err)
 			state := p.Build()
 
 			assert.Equal(tt.wantTarget, *state.Upstreams[0].Targets[0].Target.Target)
@@ -4695,7 +4743,8 @@ func TestCertificate(t *testing.T) {
 			Secrets:          secrets,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(3, len(state.Certificates))
@@ -4787,7 +4836,8 @@ func TestCertificate(t *testing.T) {
 			Secrets:          secrets,
 		})
 		assert.Nil(err)
-		p := NewParser(logrus.New(), store)
+		p, err := NewParser(logrus.New(), store)
+		require.NoError(t, err)
 		state := p.Build()
 		assert.NotNil(state)
 		assert.Equal(1, len(state.Certificates))
