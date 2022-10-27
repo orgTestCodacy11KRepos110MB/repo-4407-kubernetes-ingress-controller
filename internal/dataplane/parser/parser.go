@@ -52,7 +52,7 @@ type Parser struct {
 	featureEnabledCombinedServiceRoutes             bool
 
 	flagEnabledRegexPathPrefix bool
-	errorsCollector            *TranslationErrorsCollector
+	errorsCollector            *TranslationFailuresCollector
 }
 
 // NewParser produces a new Parser object provided a logging mechanism
@@ -61,7 +61,7 @@ func NewParser(
 	logger logrus.FieldLogger,
 	storer store.Storer,
 ) (*Parser, error) {
-	errorsCollector, err := NewTranslationErrorsCollector(logger)
+	errorsCollector, err := NewTranslationFailuresCollector(logger)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create translation errors collector")
 	}
@@ -79,7 +79,7 @@ func NewParser(
 
 // Build creates a Kong configuration from Ingress and Custom resources
 // defined in Kubernetes.
-func (p *Parser) Build() *kongstate.KongState {
+func (p *Parser) Build() (*kongstate.KongState, []TranslationFailure) {
 	// parse and merge all rules together from all Kubernetes API sources
 	ingressRules := mergeIngressRules(
 		p.ingressRulesFromIngressV1beta1(),
@@ -128,7 +128,7 @@ func (p *Parser) Build() *kongstate.KongState {
 	// populate CA certificates in Kong
 	result.CACertificates = getCACerts(p.logger, p.storer, result.Plugins)
 
-	return &result
+	return &result, p.popTranslationFailures()
 }
 
 // -----------------------------------------------------------------------------
@@ -182,8 +182,8 @@ func (p *Parser) EnableRegexPathPrefix() {
 	p.flagEnabledRegexPathPrefix = true
 }
 
-func (p *Parser) PopTranslationErrors() []TranslationError {
-	return p.errorsCollector.PopTranslationErrors()
+func (p *Parser) popTranslationFailures() []TranslationFailure {
+	return p.errorsCollector.PopTranslationFailures()
 }
 
 // -----------------------------------------------------------------------------
