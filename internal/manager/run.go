@@ -182,9 +182,12 @@ func Run(ctx context.Context, c *Config, diagnostic util.ConfigDumpDiagnostic) e
 		return fmt.Errorf("unable to setup healthz: %w", err)
 	}
 	if err := mgr.AddReadyzCheck("check", func(_ *http.Request) error {
+		setupLog.Info("TRX determining readyz response")
 		if !synchronizer.IsReady() {
+			setupLog.Info("TRX IsReady returned false")
 			return errors.New("synchronizer not yet configured")
 		}
+		setupLog.Info("TRX IsReady returned true")
 		return nil
 	}); err != nil {
 		return fmt.Errorf("unable to setup readyz: %w", err)

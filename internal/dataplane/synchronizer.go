@@ -3,6 +3,7 @@ package dataplane
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -118,13 +119,16 @@ func (p *Synchronizer) IsRunning() bool {
 func (p *Synchronizer) IsReady() bool {
 	// If the proxy is has no database, it is only ready after a successful sync
 	// Otherwise, it has no configuration loaded
+	p.logger.Info(fmt.Sprintf("TRX entered IsReady, stack trace: %s", debug.Stack()))
 	if p.dataplaneClient.DBMode() == "off" {
 		p.lock.RLock()
 		defer p.lock.RUnlock()
+		p.logger.Info(fmt.Sprintf("TRX IsReady called in DB-less mode, acquired lock, returning %t", p.configApplied))
 		return p.configApplied
 	}
 	// If the proxy has a database, it is ready immediately
 	// It will load existing configuration from the database
+	p.logger.Info("TRX IsReady called in DB mode, returning true")
 	return true
 }
 
@@ -159,11 +163,14 @@ func (p *Synchronizer) startUpdateServer(ctx context.Context) {
 
 			return
 		case <-p.syncTicker.C:
+			p.logger.Info("TRX sync ticker fired, calling dataplaneClient.Update")
 			if err := p.dataplaneClient.Update(ctx); err != nil {
 				p.logger.Error(err, "could not update kong admin")
 				break
 			}
+			p.logger.Info("TRX sync ticker completed dataplaneClient.Update")
 			initialConfig.Do(p.markConfigApplied)
+			p.logger.Info("TRX sync ticker marked config applied")
 		}
 	}
 }
@@ -175,6 +182,7 @@ func (p *Synchronizer) startUpdateServer(ctx context.Context) {
 // markConfigApplied marks that config has been applied
 func (p *Synchronizer) markConfigApplied() {
 	p.lock.Lock()
+	p.logger.Info(fmt.Sprintf("TRX acquired config status lock, marking applied, stack trace: %s", debug.Stack()))
 	defer p.lock.Unlock()
 	p.configApplied = true
 }

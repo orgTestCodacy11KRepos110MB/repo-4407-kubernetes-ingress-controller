@@ -45,6 +45,7 @@ func PerformUpdate(ctx context.Context,
 	if err != nil {
 		return oldSHA, err
 	}
+	log.Info("TRX starting PerformUpdate")
 	// disable optimization if reverse sync is enabled
 	if !reverseSync {
 		// use the previous SHA to determine whether or not to perform an update
@@ -75,7 +76,9 @@ func PerformUpdate(ctx context.Context,
 	timeStart := time.Now()
 	if inMemory {
 		metricsProtocol = metrics.ProtocolDBLess
+		log.Info("TRX calling onUpdateInMemoryMode")
 		err = onUpdateInMemoryMode(ctx, log, targetContent, customEntities, kongConfig)
+		log.Info("TRX completed onUpdateInMemoryMode")
 	} else {
 		metricsProtocol = metrics.ProtocolDeck
 		err = onUpdateDBMode(ctx, targetContent, kongConfig, selectorTags, skipCACertificates)
@@ -103,6 +106,7 @@ func PerformUpdate(ctx context.Context,
 		metrics.ProtocolKey: metricsProtocol,
 	}).Observe(float64(timeEnd.Sub(timeStart).Milliseconds()))
 	log.Info("successfully synced configuration to kong.")
+	log.Info("TRX returning from PerformUpdate")
 	return newSHA, nil
 }
 
@@ -188,7 +192,9 @@ func onUpdateInMemoryMode(ctx context.Context,
 
 	req.URL.RawQuery = queryString.Encode()
 
-	_, err = kongConfig.Client.Do(ctx, req, nil)
+	log.Info("TRX sending config update HTTP request to Kong")
+	resp, err := kongConfig.Client.Do(ctx, req, nil)
+	log.Infof(fmt.Sprintf("TRX completed update HTTP request to Kong, status '%s' and size %d", resp.Status, resp.ContentLength))
 	if err != nil {
 		return fmt.Errorf("posting new config to /config: %w", err)
 	}
