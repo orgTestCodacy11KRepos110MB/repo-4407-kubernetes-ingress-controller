@@ -9,10 +9,14 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
 	"sync"
 	"time"
 
+	"github.com/blang/semver/v4"
+
+	deckcmd "github.com/kong/deck/cmd"
 	"github.com/kong/deck/diff"
 	"github.com/kong/deck/dump"
 	"github.com/kong/deck/file"
@@ -85,6 +89,17 @@ func PerformUpdate(ctx context.Context,
 		err = onUpdateDBMode(ctx, targetContent, kongConfig, selectorTags, skipCACertificates)
 	}
 	timeEnd := time.Now()
+
+	if os.Getenv("KONG_SYNC_WITH_KONNECT") == "true" {
+		if err := syncWithKonnect(ctx, targetContent, kongConfig, skipCACertificates); err != nil {
+			log.WithError(err).Error("failed to sync with Konnect")
+		} else {
+			log.Info("synchronised with Konnect")
+		}
+	} else {
+		log.Info("not syncing with konnect")
+		log.Info(os.Getenv("KONG_SYNC_WITH_KONNECT"))
+	}
 
 	if err != nil {
 		promMetrics.ConfigPushCount.With(prometheus.Labels{
@@ -210,12 +225,12 @@ func onUpdateDBMode(ctx context.Context,
 ) error {
 	dumpConfig := dump.Config{SelectorTags: selectorTags, SkipCACerts: skipCACertificates}
 
-	cs, err := currentState(ctx, kongConfig, dumpConfig)
+	cs, err := currentState(ctx, kongConfig.Client, dumpConfig)
 	if err != nil {
 		return err
 	}
 
-	ts, err := targetState(ctx, targetContent, cs, kongConfig, dumpConfig)
+	ts, err := targetState(ctx, targetContent, cs, kongConfig.Client, kongConfig.Version, dumpConfig)
 	if err != nil {
 		return deckConfigConflictError{err}
 	}
@@ -237,8 +252,55 @@ func onUpdateDBMode(ctx context.Context,
 	return nil
 }
 
-func currentState(ctx context.Context, kongConfig *Kong, dumpConfig dump.Config) (*state.KongState, error) {
-	rawState, err := dump.Get(ctx, kongConfig.Client, dumpConfig)
+func syncWithKonnect(
+	ctx context.Context,
+	targetContent *file.Content,
+	kongConfig *Kong,
+	skipCACertificates bool,
+) error {
+	c, err := deckcmd.GetKongClientForKonnectMode(ctx, &deckutils.KonnectConfig{
+		Token:   os.Getenv("KONG_KONNECT_TOKEN"),
+		Address: "https://us.api.konghq.com",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create kong client for konnect: %w", err)
+	}
+
+	dumpConfig := dump.Config{
+		SkipCACerts:         skipCACertificates,
+		KonnectRuntimeGroup: "default",
+	}
+
+	cs, err := currentState(ctx, c, dumpConfig)
+	if err != nil {
+		return err
+	}
+
+	ts, err := targetState(ctx, targetContent, cs, c, kongConfig.Version, dumpConfig)
+	if err != nil {
+		return deckConfigConflictError{err}
+	}
+
+	syncer, err := diff.NewSyncer(diff.SyncerOpts{
+		CurrentState:    cs,
+		TargetState:     ts,
+		KongClient:      c,
+		SilenceWarnings: true,
+	})
+	if err != nil {
+		return fmt.Errorf("creating a new syncer for konnect: %w", err)
+	}
+
+	_, errs := syncer.Solve(ctx, kongConfig.Concurrency, false)
+	if errs != nil {
+		return deckutils.ErrArray{Errors: errs}
+	}
+
+	return nil
+}
+
+func currentState(ctx context.Context, kongClient *kong.Client, dumpConfig dump.Config) (*state.KongState, error) {
+	rawState, err := dump.Get(ctx, kongClient, dumpConfig)
 	if err != nil {
 		return nil, fmt.Errorf("loading configuration from kong: %w", err)
 	}
@@ -246,11 +308,11 @@ func currentState(ctx context.Context, kongConfig *Kong, dumpConfig dump.Config)
 	return state.Get(rawState)
 }
 
-func targetState(ctx context.Context, targetContent *file.Content, currentState *state.KongState, kongConfig *Kong, dumpConfig dump.Config) (*state.KongState, error) {
+func targetState(ctx context.Context, targetContent *file.Content, currentState *state.KongState, kongClient *kong.Client, kongVersion semver.Version, dumpConfig dump.Config) (*state.KongState, error) {
 	rawState, err := file.Get(ctx, targetContent, file.RenderConfig{
 		CurrentState: currentState,
-		KongVersion:  kongConfig.Version,
-	}, dumpConfig, kongConfig.Client)
+		KongVersion:  kongVersion,
+	}, dumpConfig, kongClient)
 	if err != nil {
 		return nil, err
 	}
