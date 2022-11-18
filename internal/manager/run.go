@@ -6,8 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"regexp"
 	"time"
+
+	"github.com/go-logr/logr"
+
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/dataplane/sendconfig"
 
 	"github.com/avast/retry-go/v4"
 	"github.com/blang/semver/v4"
@@ -75,54 +80,13 @@ func Run(ctx context.Context, c *Config, diagnostic util.ConfigDumpDiagnostic, d
 		return fmt.Errorf("unable to build kong api client: %w", err)
 	}
 
-	var kongRoot map[string]interface{}
-	err = retry.Do(
-		func() error {
-			kongRoot, err = adminClient.Root(ctx)
-			// Abort if the provided context has been cancelled.
-			if errors.Is(err, context.Canceled) {
-				return retry.Unrecoverable(err)
-			}
-			return err
-		},
-		retry.Attempts(c.KongAdminInitializationRetries),
-		retry.Delay(c.KongAdminInitializationRetryDelay),
-		retry.DelayType(retry.FixedDelay),
-		retry.LastErrorOnly(true),
-		retry.OnRetry(func(n uint, err error) {
-			setupLog.Info("Retrying kong admin api client call after error",
-				"retries", fmt.Sprintf("%d/%d", n, c.KongAdminInitializationRetries),
-				"error", err.Error(),
-			)
-		}),
-	)
-
+	kongConfig, err := makeKongConfig(ctx, setupLog, c, adminClient)
 	if err != nil {
-		return fmt.Errorf("could not retrieve Kong admin root: %w", err)
-	}
-
-	kongConfig := setupKongConfig(ctx, adminClient, setupLog, c)
-	kongVersion, err := kong.ParseSemanticVersion(kong.VersionFromInfo(kongRoot))
-	if err != nil {
-		setupLog.V(util.WarnLevel).Info("could not parse Kong version, version-specific behavior disabled", "error", err)
-	} else {
-		versions.SetKongVersion(semver.Version{Major: kongVersion.Major(), Minor: kongVersion.Minor(), Patch: kongVersion.Patch()})
-	}
-	kongRootConfig, ok := kongRoot["configuration"].(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("invalid root configuration, expected a map[string]interface{} got %T",
-			kongRoot["configuration"])
-	}
-	dbmode, ok := kongRootConfig["database"].(string)
-	if !ok {
-		return fmt.Errorf("invalid database configuration, expected a string got %T", kongRootConfig["database"])
-	}
-	if dbmode == "off" && c.SkipCACertificates {
-		return fmt.Errorf("--skip-ca-certificates is not available for use with DB-less Kong instances")
+		return fmt.Errorf("failed to make kong config: %w", err)
 	}
 
 	setupLog.Info("configuring and building the controller manager")
-	controllerOpts, err := setupControllerOptions(setupLog, c, scheme, dbmode)
+	controllerOpts, err := setupControllerOptions(setupLog, c, scheme, "off")
 	if err != nil {
 		return fmt.Errorf("unable to setup controller options: %w", err)
 	}
@@ -233,4 +197,58 @@ func isControllerNameValid(controllerName string) bool {
 	// https://github.com/kubernetes-sigs/gateway-api/blob/547122f7f55ac0464685552898c560658fb40073/apis/v1beta1/shared_types.go#L448-L463
 	re := regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/[A-Za-z0-9\/\-._~%!$&'()*+,;=:]+$`)
 	return re.Match([]byte(controllerName))
+}
+
+func makeKongConfig(ctx context.Context, setupLog logr.Logger, c *Config, adminClient *kong.Client) (sendconfig.Kong, error) {
+	kongConfig := setupKongConfig(ctx, adminClient, setupLog, c)
+
+	if os.Getenv("KONG_SYNC_WITH_KONNECT") != "true" {
+		var kongRoot map[string]interface{}
+		err := retry.Do(
+			func() error {
+				var err error
+				kongRoot, err = adminClient.Root(ctx)
+				// Abort if the provided context has been cancelled.
+				if errors.Is(err, context.Canceled) {
+					return retry.Unrecoverable(err)
+				}
+				return err
+			},
+			retry.Attempts(c.KongAdminInitializationRetries),
+			retry.Delay(c.KongAdminInitializationRetryDelay),
+			retry.DelayType(retry.FixedDelay),
+			retry.LastErrorOnly(true),
+			retry.OnRetry(func(n uint, err error) {
+				setupLog.Info("Retrying kong admin api client call after error",
+					"retries", fmt.Sprintf("%d/%d", n, c.KongAdminInitializationRetries),
+					"error", err.Error(),
+				)
+			}),
+		)
+
+		if err != nil {
+			return sendconfig.Kong{}, fmt.Errorf("could not retrieve Kong admin root: %w", err)
+		}
+
+		kongVersion, err := kong.ParseSemanticVersion(kong.VersionFromInfo(kongRoot))
+		if err != nil {
+			setupLog.V(util.WarnLevel).Info("could not parse Kong version, version-specific behavior disabled", "error", err)
+		} else {
+			versions.SetKongVersion(semver.Version{Major: kongVersion.Major(), Minor: kongVersion.Minor(), Patch: kongVersion.Patch()})
+		}
+		kongRootConfig, ok := kongRoot["configuration"].(map[string]interface{})
+		if !ok {
+			return sendconfig.Kong{}, fmt.Errorf("invalid root configuration, expected a map[string]interface{} got %T",
+				kongRoot["configuration"])
+		}
+		dbmode, ok := kongRootConfig["database"].(string)
+		if !ok {
+			return sendconfig.Kong{}, fmt.Errorf("invalid database configuration, expected a string got %T", kongRootConfig["database"])
+		}
+		if dbmode == "off" && c.SkipCACertificates {
+			return sendconfig.Kong{}, fmt.Errorf("--skip-ca-certificates is not available for use with DB-less Kong instances")
+		}
+	}
+
+	return kongConfig, nil
 }

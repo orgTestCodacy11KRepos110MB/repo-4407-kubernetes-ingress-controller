@@ -9,20 +9,16 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"reflect"
 	"sync"
 	"time"
-
-	"github.com/kong/deck/konnect"
 
 	"github.com/blang/semver/v4"
 	"github.com/kong/deck/diff"
 	"github.com/kong/deck/dump"
 	"github.com/kong/deck/file"
 	"github.com/kong/deck/state"
-	"github.com/kong/deck/utils"
 	deckutils "github.com/kong/deck/utils"
 	"github.com/kong/go-kong/kong"
 	"github.com/prometheus/client_golang/prometheus"
@@ -65,42 +61,39 @@ func PerformUpdate(ctx context.Context,
 			// we assume ready as not all Kong versions provide their configuration hash, and their readiness state
 			// is always unknown
 			// ready := true
-			status, err := kongConfig.Client.Status(ctx)
-			if err != nil {
-				log.WithError(err).Error("checking config status failed")
-				log.Debug("configuration state unknown, skipping sync to kong")
-				return oldSHA, nil
-			}
-			if status.ConfigurationHash == initialHash {
-				// ready = false
-			}
-			// if ready {
-			// 	log.Debug("no configuration change, skipping sync to kong")
+			// status, err := kongConfig.Client.Status(ctx)
+			// if err != nil {
+			// 	log.WithError(err).Error("checking config status failed")
+			// 	log.Debug("configuration state unknown, skipping sync to kong")
 			// 	return oldSHA, nil
 			// }
+			// if status.ConfigurationHash == initialHash {
+			// ready = false
 		}
+		// if ready {
+		// 	log.Debug("no configuration change, skipping sync to kong")
+		// 	return oldSHA, nil
+		// }
+		// }
 	}
+
+	syncWithConnect := os.Getenv("KONG_SYNC_WITH_KONNECT") == "true"
 
 	var metricsProtocol string
 	timeStart := time.Now()
-	if inMemory {
-		metricsProtocol = metrics.ProtocolDBLess
-		err = onUpdateInMemoryMode(ctx, log, targetContent, customEntities, kongConfig)
-	} else {
+	if syncWithConnect {
 		metricsProtocol = metrics.ProtocolDeck
-		err = onUpdateDBMode(ctx, targetContent, kongConfig, selectorTags, skipCACertificates)
+		err = syncWithKonnect(ctx, targetContent, kongConfig, skipCACertificates)
+	} else {
+		if inMemory {
+			metricsProtocol = metrics.ProtocolDBLess
+			err = onUpdateInMemoryMode(ctx, log, targetContent, customEntities, kongConfig)
+		} else {
+			metricsProtocol = metrics.ProtocolDeck
+			err = onUpdateDBMode(ctx, targetContent, kongConfig, selectorTags, skipCACertificates)
+		}
 	}
 	timeEnd := time.Now()
-
-	if os.Getenv("KONG_SYNC_WITH_KONNECT") == "true" {
-		if err := syncWithKonnect(ctx, targetContent, kongConfig, skipCACertificates); err != nil {
-			log.WithError(err).Error("failed to sync with Konnect")
-		} else {
-			log.Info("synchronised with Konnect")
-		}
-	} else {
-		log.Info("not syncing with konnect")
-	}
 
 	if err != nil {
 		promMetrics.ConfigPushCount.With(prometheus.Labels{
@@ -253,105 +246,23 @@ func onUpdateDBMode(ctx context.Context,
 	return nil
 }
 
-type KonnectConfig struct {
-	Token        string
-	RuntimeGroup string
-	Address      string
-}
-
-const defaultKonnectAPIAddress = "https://api.konghq.com"
-
-func NewKongClientForKonnect(
-	ctx context.Context, konnectConfig KonnectConfig,
-) (*kong.Client, error) {
-	httpClient := deckutils.HTTPClient()
-	if konnectConfig.Address == "" {
-		konnectConfig.Address = defaultKonnectAPIAddress
-	}
-	if konnectConfig.Token == "" {
-		return nil, errors.New("empty konnect token provided")
-	}
-
-	headers := []string{"Authorization:Bearer " + konnectConfig.Token}
-	konnectClient, err := utils.GetKonnectClient(httpClient, deckutils.KonnectConfig{
-		Headers: headers,
-		Address: konnectConfig.Address,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = url.Parse(konnectConfig.Address)
-	if err != nil {
-		return nil, fmt.Errorf("parsing %s address: %v", konnectConfig.Address, err)
-	}
-
-	_, err = konnectClient.Auth.LoginV2(ctx, "", "", konnectConfig.Token)
-	if err != nil {
-		return nil, fmt.Errorf("authenticating with Konnect: %w", err)
-	}
-
-	runtimeGroupID, err := konnectRuntimeGroupNameToID(ctx, konnectClient, konnectConfig.RuntimeGroup)
-	if err != nil {
-		return nil, fmt.Errorf("could not map runtime group name to id: %w", err)
-	}
-
-	return utils.GetKongClient(utils.KongClientConfig{
-		Address:    konnectConfig.Address + "/konnect-api/api/runtime_groups/" + runtimeGroupID,
-		HTTPClient: httpClient,
-		Debug:      true,
-		Headers:    headers,
-		Retryable:  true,
-	})
-}
-
-func konnectRuntimeGroupNameToID(ctx context.Context,
-	client *konnect.Client,
-	runtimeGroupName string,
-) (string, error) {
-	runtimeGroups, _, err := client.RuntimeGroups.List(ctx, nil)
-	if err != nil {
-		return "", fmt.Errorf("fetching runtime groups: %w", err)
-	}
-	for _, rg := range runtimeGroups {
-		if *rg.Name == runtimeGroupName {
-			return *rg.ID, nil
-		}
-	}
-	return "", fmt.Errorf("runtime groups not found: %s", runtimeGroupName)
-}
-
 func syncWithKonnect(
 	ctx context.Context,
 	targetContent *file.Content,
 	kongConfig *Kong,
 	skipCACertificates bool,
 ) error {
-	address := os.Getenv("KONG_KONNECT_ADDRESS")
-	if address == "" {
-		address = defaultKonnectAPIAddress
-	}
-	rg := os.Getenv("KONG_KONNECT_RG")
-	c, err := NewKongClientForKonnect(ctx, KonnectConfig{
-		Token:        os.Getenv("KONG_KONNECT_TOKEN"),
-		Address:      address,
-		RuntimeGroup: rg,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create kong client for konnect: %w", err)
-	}
-
 	dumpConfig := dump.Config{
 		SkipCACerts:         skipCACertificates,
-		KonnectRuntimeGroup: rg,
+		KonnectRuntimeGroup: os.Getenv("KONG_KONNECT_RG"),
 	}
 
-	cs, err := currentState(ctx, c, dumpConfig)
+	cs, err := currentState(ctx, kongConfig.Client, dumpConfig)
 	if err != nil {
 		return fmt.Errorf("could not build current state: %w", err)
 	}
 
-	ts, err := targetState(ctx, targetContent, cs, c, kongConfig.Version, dumpConfig)
+	ts, err := targetState(ctx, targetContent, cs, kongConfig.Client, kongConfig.Version, dumpConfig)
 	if err != nil {
 		return fmt.Errorf("could not build target state: %w", err)
 	}
@@ -359,7 +270,7 @@ func syncWithKonnect(
 	syncer, err := diff.NewSyncer(diff.SyncerOpts{
 		CurrentState:    cs,
 		TargetState:     ts,
-		KongClient:      c,
+		KongClient:      kongConfig.Client,
 		SilenceWarnings: false,
 	})
 	if err != nil {

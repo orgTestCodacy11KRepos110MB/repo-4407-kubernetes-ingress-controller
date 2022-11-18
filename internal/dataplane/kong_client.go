@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/blang/semver/v4"
 	"github.com/kong/deck/file"
 	"github.com/kong/go-kong/kong"
 	"github.com/prometheus/client_golang/prometheus"
@@ -143,43 +142,43 @@ func NewKongClient(
 		eventRecorder:      eventRecorder,
 	}
 
-	// download the kong root configuration (and validate connectivity to the proxy API)
-	root, err := c.RootWithTimeout()
-	if err != nil {
-		return nil, err
-	}
-
-	// pull the proxy configuration out of the root config and validate it
-	proxyConfig, ok := root["configuration"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid root configuration, expected a map[string]interface{} got %T", proxyConfig["configuration"])
-	}
-
-	// validate the database configuration for the proxy and check for supported database configurations
-	dbmode, ok := proxyConfig["database"].(string)
-	if !ok {
-		return nil, fmt.Errorf("invalid database configuration, expected a string got %t", proxyConfig["database"])
-	}
-	switch dbmode {
-	case "off", "":
-		c.kongConfig.InMemory = true
-	case "postgres":
-		c.kongConfig.InMemory = false
-	case "cassandra":
-		return nil, fmt.Errorf("Cassandra-backed deployments of Kong managed by the ingress controller are no longer supported; you must migrate to a Postgres-backed or DB-less deployment")
-	default:
-		return nil, fmt.Errorf("%s is not a supported database backend", dbmode)
-	}
-
-	// validate the proxy version
-	proxyVersion, err := kong.ParseSemanticVersion(kong.VersionFromInfo(root))
-	if err != nil {
-		return nil, err
-	}
-
-	// store the gathered configuration options
-	c.kongConfig.Version = semver.Version{Major: proxyVersion.Major(), Minor: proxyVersion.Minor(), Patch: proxyVersion.Patch()}
-	c.dbmode = dbmode
+	// // download the kong root configuration (and validate connectivity to the proxy API)
+	// root, err := c.RootWithTimeout()
+	// if err != nil {
+	// 	return nil, err
+	// }
+	//
+	// // pull the proxy configuration out of the root config and validate it
+	// proxyConfig, ok := root["configuration"].(map[string]interface{})
+	// if !ok {
+	// 	return nil, fmt.Errorf("invalid root configuration, expected a map[string]interface{} got %T", proxyConfig["configuration"])
+	// }
+	//
+	// // validate the database configuration for the proxy and check for supported database configurations
+	// dbmode, ok := proxyConfig["database"].(string)
+	// if !ok {
+	// 	return nil, fmt.Errorf("invalid database configuration, expected a string got %t", proxyConfig["database"])
+	// }
+	// switch dbmode {
+	// case "off", "":
+	// 	c.kongConfig.InMemory = true
+	// case "postgres":
+	// 	c.kongConfig.InMemory = false
+	// case "cassandra":
+	// 	return nil, fmt.Errorf("Cassandra-backed deployments of Kong managed by the ingress controller are no longer supported; you must migrate to a Postgres-backed or DB-less deployment")
+	// default:
+	// 	return nil, fmt.Errorf("%s is not a supported database backend", dbmode)
+	// }
+	//
+	// // validate the proxy version
+	// proxyVersion, err := kong.ParseSemanticVersion(kong.VersionFromInfo(root))
+	// if err != nil {
+	// 	return nil, err
+	// }
+	//
+	// // store the gathered configuration options
+	// c.kongConfig.Version = semver.Version{Major: proxyVersion.Major(), Minor: proxyVersion.Minor(), Patch: proxyVersion.Patch()}
+	// c.dbmode = dbmode
 
 	return c, nil
 }

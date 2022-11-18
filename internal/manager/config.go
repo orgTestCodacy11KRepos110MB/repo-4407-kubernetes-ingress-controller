@@ -2,8 +2,16 @@ package manager
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/url"
+	"os"
 	"time"
+
+	"github.com/kong/deck/konnect"
+
+	"github.com/kong/deck/utils"
+	deckutils "github.com/kong/deck/utils"
 
 	"github.com/kong/go-kong/kong"
 	"github.com/spf13/pflag"
@@ -228,6 +236,24 @@ func (c *Config) FlagSet() *pflag.FlagSet {
 }
 
 func (c *Config) GetKongClient(ctx context.Context) (*kong.Client, error) {
+	if os.Getenv("KONG_KONNECT_TOKEN") != "" {
+		address := os.Getenv("KONG_KONNECT_ADDRESS")
+		if address == "" {
+			address = defaultKonnectAPIAddress
+		}
+		rg := os.Getenv("KONG_KONNECT_RG")
+		c, err := NewKongClientForKonnect(ctx, KonnectConfig{
+			Token:        os.Getenv("KONG_KONNECT_TOKEN"),
+			Address:      address,
+			RuntimeGroup: rg,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create kong client for konnect: %w", err)
+		}
+
+		return c, nil
+	}
+
 	if c.KongAdminToken != "" {
 		c.KongAdminAPIConfig.Headers = append(c.KongAdminAPIConfig.Headers, "kong-admin-token:"+c.KongAdminToken)
 	}
@@ -237,6 +263,75 @@ func (c *Config) GetKongClient(ctx context.Context) (*kong.Client, error) {
 	}
 
 	return adminapi.GetKongClientForWorkspace(ctx, c.KongAdminURL, c.KongWorkspace, httpclient)
+
+}
+
+type KonnectConfig struct {
+	Token        string
+	RuntimeGroup string
+	Address      string
+}
+
+const defaultKonnectAPIAddress = "https://api.konghq.com"
+
+func NewKongClientForKonnect(
+	ctx context.Context, konnectConfig KonnectConfig,
+) (*kong.Client, error) {
+	httpClient := deckutils.HTTPClient()
+	if konnectConfig.Address == "" {
+		konnectConfig.Address = defaultKonnectAPIAddress
+	}
+	if konnectConfig.Token == "" {
+		return nil, errors.New("empty konnect token provided")
+	}
+
+	headers := []string{"Authorization:Bearer " + konnectConfig.Token}
+	konnectClient, err := utils.GetKonnectClient(httpClient, deckutils.KonnectConfig{
+		Headers: headers,
+		Address: konnectConfig.Address,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = url.Parse(konnectConfig.Address)
+	if err != nil {
+		return nil, fmt.Errorf("parsing %s address: %v", konnectConfig.Address, err)
+	}
+
+	_, err = konnectClient.Auth.LoginV2(ctx, "", "", konnectConfig.Token)
+	if err != nil {
+		return nil, fmt.Errorf("authenticating with Konnect: %w", err)
+	}
+
+	runtimeGroupID, err := konnectRuntimeGroupNameToID(ctx, konnectClient, konnectConfig.RuntimeGroup)
+	if err != nil {
+		return nil, fmt.Errorf("could not map runtime group name to id: %w", err)
+	}
+
+	return utils.GetKongClient(utils.KongClientConfig{
+		Address:    konnectConfig.Address + "/konnect-api/api/runtime_groups/" + runtimeGroupID,
+		HTTPClient: httpClient,
+		Debug:      true,
+		Headers:    headers,
+		Retryable:  true,
+	})
+}
+
+func konnectRuntimeGroupNameToID(ctx context.Context,
+	client *konnect.Client,
+	runtimeGroupName string,
+) (string, error) {
+	runtimeGroups, _, err := client.RuntimeGroups.List(ctx, nil)
+	if err != nil {
+		return "", fmt.Errorf("fetching runtime groups: %w", err)
+	}
+	for _, rg := range runtimeGroups {
+		if *rg.Name == runtimeGroupName {
+			return *rg.ID, nil
+		}
+	}
+	return "", fmt.Errorf("runtime groups not found: %s", runtimeGroupName)
 }
 
 func (c *Config) GetKubeconfig() (*rest.Config, error) {

@@ -28,5 +28,6 @@ type Kong struct {
 
 	Version semver.Version
 
-	Concurrency int
+	Concurrency  int
+	RuntimeGroup string
 }
