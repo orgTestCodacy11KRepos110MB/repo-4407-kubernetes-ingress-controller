@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/util/builder"
+
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -631,4 +633,24 @@ func isGatewayClassEventInClass(log logr.Logger, watchEvent interface{}) bool {
 	}
 
 	return false
+}
+
+func getListenerSupportedRouteKinds(listener gatewayv1beta1.Listener) []gatewayv1beta1.RouteGroupKind {
+	b := builder.NewRouteGroupKind()
+
+	switch listener.Protocol {
+	case HTTPProtocolType:
+	case HTTPSProtocolType:
+		b = b.HTTPRoute()
+	case TCPProtocolType:
+		b = b.TCPRoute()
+	case UDPProtocolType:
+		b = b.UDPRoute()
+	case TLSProtocolType:
+		b = b.TLSRoute()
+	default:
+		return supportedRouteGroupKinds
+	}
+
+	return b.IntoSlice()
 }
