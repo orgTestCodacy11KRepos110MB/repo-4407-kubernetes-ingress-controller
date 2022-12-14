@@ -335,7 +335,6 @@ func (c *KongClient) Update(ctx context.Context) error {
 		c.prometheusMetrics.TranslationCount.With(prometheus.Labels{
 			metrics.SuccessKey: metrics.SuccessFalse,
 		}).Inc()
-		c.recordResourceFailureEvents(translationFailures, KongConfigurationTranslationFailedEventReason)
 		c.logger.Debugf("%d translation failures have occurred when building data-plane configuration", failuresCount)
 	} else {
 		c.prometheusMetrics.TranslationCount.With(prometheus.Labels{
@@ -419,6 +418,9 @@ func (c *KongClient) Update(ctx context.Context) error {
 			report := p.GenerateKubernetesObjectReport()
 			c.logger.Debugf("triggering report for %d configured Kubernetes objects", len(report))
 			c.triggerKubernetesObjectReport(report...)
+
+			c.logger.Debugf("recording events for %d translation failures", len(translationFailures))
+			c.recordResourceFailureEvents(translationFailures, KongConfigurationTranslationFailedEventReason)
 		} else {
 			c.logger.Debug("no configuration change, skipping kubernetes object report")
 		}
