@@ -7,11 +7,15 @@ import (
 	"io"
 	"time"
 
+	"github.com/avast/retry-go/v4"
 	"github.com/bombsimon/logrusr/v2"
 	"github.com/go-logr/logr"
 	"github.com/kong/deck/cprint"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -20,6 +24,7 @@ import (
 
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/adminapi"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/admission"
+	"github.com/kong/kubernetes-ingress-controller/v2/internal/controllers/configuration"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/dataplane"
 	"github.com/kong/kubernetes-ingress-controller/v2/internal/util"
 )
@@ -159,7 +164,7 @@ func setupAdmissionServer(
 		return nil
 	}
 
-	kongclients, err := getKongClients(ctx, managerConfig)
+	kongclients, err := managerConfig.getKongClients(ctx)
 	if err != nil {
 		return err
 	}
@@ -258,21 +263,96 @@ func generateAddressFinderGetter(mgrc client.Client, publishServiceNn types.Name
 	}
 }
 
-// getKongClients returns the kong clients.
-func getKongClients(ctx context.Context, cfg *Config) ([]*adminapi.Client, error) {
-	httpclient, err := adminapi.MakeHTTPClient(&cfg.KongAdminAPIConfig)
+// getKongClients returns the kong clients given the config.
+func (c *Config) getKongClients(ctx context.Context) ([]*adminapi.Client, error) {
+	httpclient, err := adminapi.MakeHTTPClient(&c.KongAdminAPIConfig, c.KongAdminToken)
 	if err != nil {
 		return nil, err
 	}
 
-	clients := make([]*adminapi.Client, 0, len(cfg.KongAdminURL))
-	for _, url := range cfg.KongAdminURL {
-		client, err := adminapi.NewKongClientForWorkspace(ctx, url, cfg.KongWorkspace, httpclient)
+	var addresses []string
+
+	// If kong-admin-svc flag has been specified then use it to get the list
+	// of Kong Admin API endpoints.
+	if c.KongAdminSvc.Name != "" {
+		kubeClient, err := c.GetKubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		// Retry this as we may either encounter an error of get 0 addresses,
+		// which can mean that Kong instances meant to be configured by this controller
+		// are not yet ready.
+		// If we end up in a situation where none of them are ready then bail
+		// because we have more code that relies on the configuration of Kong
+		// instance and without an address there's no way to initialize the
+		// configuration validation and sending code.
+		err = retry.Do(func() error {
+			var err error
+			addresses, err = GetEndpointslicesForService(ctx, kubeClient, c.KongAdminSvc)
+			if err != nil {
+				return err
+			}
+			if len(addresses) == 0 {
+				return fmt.Errorf("no endpoints for kong admin service: %q", c.KongAdminSvc)
+			}
+			return nil
+		},
+			retry.Attempts(60),
+			retry.DelayType(retry.FixedDelay),
+			retry.Delay(time.Second),
+			retry.OnRetry(func(_ uint, err error) {
+				logrus.New().WithError(err).Error("failed to create kong client(s)")
+			}),
+		)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		addresses = c.KongAdminURLs
+	}
+
+	clients := make([]*adminapi.Client, 0, len(addresses))
+	for _, address := range addresses {
+		client, err := adminapi.NewKongClientForWorkspace(ctx, address, c.KongWorkspace, httpclient)
 		if err != nil {
 			return nil, err
 		}
 		clients = append(clients, client)
 	}
-
 	return clients, nil
+}
+
+// GetEndpointslicesForService performs an endpoint lookup, using provided kubeClient
+// to list provided service's endpointslices.
+func GetEndpointslicesForService(ctx context.Context, kubeClient client.Client, service types.NamespacedName) ([]string, error) {
+	// Get all the endpointslices assigned to the provided service.
+	labelReq, err := labels.NewRequirement("kubernetes.io/service-name", selection.Equals, []string{service.Name})
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		addresses     []string
+		continueToken string
+	)
+	for {
+		var endpointsList discoveryv1.EndpointSliceList
+		if err := kubeClient.List(ctx, &endpointsList, &client.ListOptions{
+			LabelSelector: labels.NewSelector().Add(*labelReq),
+			Namespace:     service.Namespace,
+			Continue:      continueToken,
+		}); err != nil {
+			return nil, err
+		}
+
+		for _, es := range endpointsList.Items {
+			addresses = append(addresses, configuration.AddressesFromEndpointSlice(es)...)
+		}
+
+		if endpointsList.Continue == "" {
+			break
+		}
+	}
+	return addresses, nil
 }

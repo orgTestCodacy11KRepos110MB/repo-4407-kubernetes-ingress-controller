@@ -37,6 +37,11 @@ func gatewayAPIControllerNameFromFlagValue(flagValue string) (string, error) {
 // Validate validates the config. It should be used to validate the config variables' interdependencies.
 // When a single variable is to be validated, *FromFlagValue function should be implemented.
 func (c *Config) Validate() error {
+	// TODO xxx: leave this out to allow debugging before this is complete
+	// if c.flagSet.Changed("kong-admin-svc") && c.flagSet.Changed("kong-admin-url") {
+	// 	return fmt.Errorf("can't set both kong-admin-svc and kong-admin-url")
+	// }
+
 	if err := c.validateKonnect(); err != nil {
 		return fmt.Errorf("invalid konnect configuration: %w", err)
 	}

@@ -46,7 +46,7 @@ func TestMakeHTTPClientWithTLSOpts(t *testing.T) {
 		},
 	}
 
-	httpclient, err := MakeHTTPClient(&opts)
+	httpclient, err := MakeHTTPClient(&opts, "")
 	require.NoError(t, err)
 
 	assert.NotNil(t, httpclient)
@@ -99,7 +99,7 @@ func TestMakeHTTPClientWithTLSOptsAndFilePaths(t *testing.T) {
 		},
 	}
 
-	httpclient, err := MakeHTTPClient(&opts)
+	httpclient, err := MakeHTTPClient(&opts, "")
 	require.NoError(t, err)
 
 	assert.NotNil(t, httpclient)

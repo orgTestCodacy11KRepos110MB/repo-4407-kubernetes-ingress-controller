@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/kong/go-kong/kong"
+	"github.com/samber/lo"
 )
 
 // NewKongClientForWorkspace returns a Kong API client for a given root API URL and workspace.
@@ -66,7 +68,7 @@ type HTTPClientOpts struct {
 }
 
 // MakeHTTPClient returns an HTTP client with the specified mTLS/headers configuration.
-func MakeHTTPClient(opts *HTTPClientOpts) (*http.Client, error) {
+func MakeHTTPClient(opts *HTTPClientOpts, kongAdminToken string) (*http.Client, error) {
 	var tlsConfig tls.Config
 
 	if opts.TLSSkipVerify {
@@ -101,6 +103,16 @@ func MakeHTTPClient(opts *HTTPClientOpts) (*http.Client, error) {
 			return nil, fmt.Errorf("failed to load --kong-admin-ca-cert from path '%s'", certPath)
 		}
 		tlsConfig.RootCAs = certPool
+	}
+
+	if kongAdminToken != "" {
+		contains := lo.ContainsBy(opts.Headers, func(header string) bool {
+			return strings.HasPrefix(header, "kong-admin-token:")
+		})
+
+		if !contains {
+			opts.Headers = append(opts.Headers, "kong-admin-token:"+kongAdminToken)
+		}
 	}
 
 	clientCertificates, err := extractClientCertificates(opts.TLSClient)
