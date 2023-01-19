@@ -2,6 +2,7 @@ package manager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -196,52 +197,50 @@ func setupAdmissionServer(
 // set or the publish service addresses if no overrides are set. If no UDP overrides or UDP publish service are set,
 // the UDP finder will also return the default addresses. If no override or publish service is set, this function
 // returns nil finders and an error.
-func setupDataplaneAddressFinder(
-	ctx context.Context,
-	mgrc client.Client,
-	c *Config,
-) (*dataplane.AddressFinder, *dataplane.AddressFinder, error) {
-	dataplaneAddressFinder := dataplane.NewAddressFinder()
-	udpDataplaneAddressFinder := dataplane.NewAddressFinder()
-	var getter func() ([]string, error)
-	if c.UpdateStatus {
-		// Default
-		if overrideAddrs := c.PublishStatusAddress; len(overrideAddrs) > 0 {
-			dataplaneAddressFinder.SetOverrides(overrideAddrs)
-		} else if c.PublishService != "" {
-			parts := strings.Split(c.PublishService, "/")
-			if len(parts) != 2 {
-				return nil, nil, fmt.Errorf("publish service %s is invalid, expecting <namespace>/<name>", c.PublishService)
-			}
-			nsn := types.NamespacedName{
-				Namespace: parts[0],
-				Name:      parts[1],
-			}
-			getter = generateAddressFinderGetter(ctx, mgrc, nsn)
-			dataplaneAddressFinder.SetGetter(getter)
-		} else {
-			return nil, nil, fmt.Errorf("status updates enabled but no method to determine data-plane addresses, need either --publish-service or --publish-status-address")
-		}
-
-		// UDP. falls back to default if not configured
-		if udpOverrideAddrs := c.PublishStatusAddressUDP; len(udpOverrideAddrs) > 0 {
-			udpDataplaneAddressFinder.SetUDPOverrides(udpOverrideAddrs)
-		} else if c.PublishServiceUDP != "" {
-			parts := strings.Split(c.PublishServiceUDP, "/")
-			if len(parts) != 2 {
-				return nil, nil, fmt.Errorf("UDP publish service %s is invalid, expecting <namespace>/<name>", c.PublishService)
-			}
-			nsn := types.NamespacedName{
-				Namespace: parts[0],
-				Name:      parts[1],
-			}
-			udpDataplaneAddressFinder.SetGetter(generateAddressFinderGetter(ctx, mgrc, nsn))
-		} else {
-			udpDataplaneAddressFinder.SetGetter(getter)
-		}
+func setupDataplaneAddressFinder(ctx context.Context, mgrc client.Client, c *Config, log logr.Logger) (*dataplane.AddressFinder, *dataplane.AddressFinder, error) {
+	if !c.UpdateStatus {
+		return nil, nil, nil
 	}
 
-	return dataplaneAddressFinder, udpDataplaneAddressFinder, nil
+	defaultAddressFinder, err := buildDataplaneAddressFinder(ctx, mgrc, c.PublishStatusAddress, c.PublishService)
+	if err != nil {
+		return nil, nil, fmt.Errorf("status updates enabled but no method to determine data-plane addresses: %w", err)
+	}
+	udpAddressFinder, err := buildDataplaneAddressFinder(ctx, mgrc, c.PublishStatusAddressUDP, c.PublishServiceUDP)
+	if err != nil {
+		log.Info("falling back to a default address finder for UDP", "reason", err.Error())
+		udpAddressFinder = defaultAddressFinder
+	}
+
+	return defaultAddressFinder, udpAddressFinder, nil
+}
+
+func buildDataplaneAddressFinder(
+	ctx context.Context,
+	mgrc client.Client,
+	publishStatusAddress []string,
+	publishService string,
+) (*dataplane.AddressFinder, error) {
+	addressFinder := dataplane.NewAddressFinder()
+
+	if overrideAddrs := publishStatusAddress; len(overrideAddrs) > 0 {
+		addressFinder.SetOverrides(overrideAddrs)
+		return addressFinder, nil
+	}
+	if publishService != "" {
+		parts := strings.Split(publishService, "/")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("publish service %s is invalid, expecting <namespace>/<name>", publishService)
+		}
+		nsn := types.NamespacedName{
+			Namespace: parts[0],
+			Name:      parts[1],
+		}
+		addressFinder.SetGetter(generateAddressFinderGetter(ctx, mgrc, nsn))
+		return addressFinder, nil
+	}
+
+	return nil, errors.New("no publish status address or publish service were provided")
 }
 
 func generateAddressFinderGetter(
