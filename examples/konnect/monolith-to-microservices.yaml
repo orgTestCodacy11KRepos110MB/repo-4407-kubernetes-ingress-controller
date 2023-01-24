@@ -1,0 +1,146 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monolith
+  labels:
+    app: monolith
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: monolith
+  template:
+    metadata:
+      labels:
+        app: monolith
+    spec:
+      containers:
+      - name: monolith
+        image: kong/httpbin:0.1.0
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    konghq.com/konnect-service: "CompanyAPI"
+  labels:
+    app: monolith
+  name: monolith
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: monolith
+---
+# New apps
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-statements
+  labels:
+    app: svc-statements
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-statements
+  template:
+    metadata:
+      labels:
+        app: svc-statements
+    spec:
+      containers:
+        - name: svc-statements
+          image: kong/httpbin:0.1.0
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    konghq.com/konnect-service: "CompanyAPI"
+  labels:
+    app: svc-statements
+  name: svc-statements
+spec:
+  ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: svc-statements
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: svc-billing
+  labels:
+    app: svc-billing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: svc-billing
+  template:
+    metadata:
+      labels:
+        app: svc-billing
+    spec:
+      containers:
+        - name: svc-billing
+          image: kong/httpbin:0.1.0
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    konghq.com/konnect-service: "CompanyAPI"
+  labels:
+    app: svc-billing
+  name: svc-billing
+spec:
+  ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: svc-billing
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress
+  annotations:
+    kubernetes.io/ingress.class: "kong"
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /v1/
+        pathType: Prefix
+        backend:
+          service:
+            name: monolith
+            port:
+              number: 80
+      - path: /v2/billing
+        pathType: Prefix
+        backend:
+          service:
+            name: svc-billing
+            port:
+              number: 80
+      - path: /v2/statements
+        pathType: Prefix
+        backend:
+          service:
+            name: svc-statements
+            port:
+              number: 80

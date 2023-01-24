@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monolith
+  labels:
+    app: monolith
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: monolith
+  template:
+    metadata:
+      labels:
+        app: monolith
+    spec:
+      containers:
+      - name: monolith
+        image: kong/httpbin:0.1.0
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    konghq.com/konnect-service: "SecureCompany"
+  labels:
+    app: monolith
+  name: monolith
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: monolith
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-read
+  annotations:
+    konghq.com/methods: GET
+    kubernetes.io/ingress.class: "kong"
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: monolith
+            port:
+              number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-write
+  annotations:
+    konghq.com/methods: POST,PUT,DELETE
+    konghq.com/plugins: secure-write-access
+    kubernetes.io/ingress.class: "kong"
+spec:
+  rules:
+  - http:
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: monolith
+              port:
+                number: 80
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: consumer-secret
+type: Opaque
+stringData:
+  kongCredType: basic-auth
+  username: consumer
+  password: pass
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongConsumer
+metadata:
+  name: consumer
+  annotations:
+    kubernetes.io/ingress.class: "kong"
+username: consumer
+credentials:
+  - consumer-secret
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: "kong"
+  name: secure-write-access
+config:
+  hide_credentials: true
+plugin: basic-auth
