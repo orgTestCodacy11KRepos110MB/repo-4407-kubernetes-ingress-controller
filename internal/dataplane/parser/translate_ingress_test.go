@@ -905,6 +905,95 @@ func TestFromIngressV1(t *testing.T) {
 	}
 }
 
+func TestFromIngressV1_MultipleIngressesUsingTheSameService(t *testing.T) {
+	store, err := store.NewFakeStore(store.FakeObjects{
+		IngressesV1: []*netv1.Ingress{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ingress-1",
+					Namespace: "namespace",
+					Annotations: map[string]string{
+						annotations.IngressClassKey: annotations.DefaultIngressClass,
+					},
+				},
+				Spec: netv1.IngressSpec{
+					Rules: []netv1.IngressRule{
+						{
+							IngressRuleValue: netv1.IngressRuleValue{
+								HTTP: &netv1.HTTPIngressRuleValue{
+									Paths: []netv1.HTTPIngressPath{
+										{
+											Path: "/ingress-1-path",
+											Backend: netv1.IngressBackend{
+												Service: &netv1.IngressServiceBackend{
+													Name: "foo-svc",
+													Port: netv1.ServiceBackendPort{Name: "http"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ingress-2",
+					Namespace: "namespace",
+					Annotations: map[string]string{
+						annotations.IngressClassKey: annotations.DefaultIngressClass,
+					},
+				},
+				Spec: netv1.IngressSpec{
+					Rules: []netv1.IngressRule{
+						{
+							IngressRuleValue: netv1.IngressRuleValue{
+								HTTP: &netv1.HTTPIngressRuleValue{
+									Paths: []netv1.HTTPIngressPath{
+										{
+											Path: "/ingress-2-path",
+											Backend: netv1.IngressBackend{
+												Service: &netv1.IngressServiceBackend{
+													Name: "foo-svc",
+													Port: netv1.ServiceBackendPort{Name: "http"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	p := mustNewParser(t, store)
+	p.featureEnabledCombinedServiceRoutes = true
+
+	parsedInfo := p.ingressRulesFromIngressV1()
+
+	require.Len(t, parsedInfo.ServiceNameToServices, 1)
+	kongService := parsedInfo.ServiceNameToServices["namespace.foo-svc.pname-http"]
+	require.NotNil(t, kongService)
+
+	assert.Len(t, kongService.Routes, 2)
+	route1 := kongService.Routes[0]
+	assert.Equal(t, "namespace.ingress-1.foo-svc..http", *route1.Name)
+	assert.Equal(t, "ingress-1", route1.Ingress.Name)
+	require.Len(t, route1.Paths, 1)
+	assert.Equal(t, "/ingress-1-path", *route1.Paths[0])
+
+	route2 := kongService.Routes[1]
+	assert.Equal(t, "namespace.ingress-2.foo-svc..http", *route2.Name)
+	assert.Equal(t, "ingress-2", route2.Ingress.Name)
+	require.Len(t, route2.Paths, 1)
+	assert.Equal(t, "/ingress-2-path", *route2.Paths[0])
+}
+
 func TestFromIngressV1_RegexPrefix(t *testing.T) {
 	assert := assert.New(t)
 	pathTypeExact := netv1.PathTypeExact
