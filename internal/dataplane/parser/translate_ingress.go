@@ -200,6 +200,7 @@ func (p *Parser) ingressRulesFromIngressV1() ingressRules {
 			&ingressList[j].CreationTimestamp)
 	})
 
+	index := translators.NewIngressTranslationIndex()
 	for _, ingress := range ingressList {
 		regexPrefix := translators.ControllerPathRegexPrefix
 		if prefix, ok := ingress.ObjectMeta.Annotations[annotations.AnnotationPrefix+annotations.RegexPrefixKey]; ok {
@@ -216,13 +217,14 @@ func (p *Parser) ingressRulesFromIngressV1() ingressRules {
 		var objectSuccessfullyParsed bool
 
 		if p.featureEnabledCombinedServiceRoutes {
-			for _, kongStateService := range translators.TranslateIngress(ingress, p.flagEnabledRegexPathPrefix) {
+			for _, kongStateService := range translators.TranslateIngress(ingress, index, p.flagEnabledRegexPathPrefix) {
 				for _, route := range kongStateService.Routes {
 					for i, path := range route.Paths {
 						newPath := maybePrependRegexPrefix(*path, regexPrefix, icp.EnableLegacyRegexDetection && p.flagEnabledRegexPathPrefix)
 						route.Paths[i] = &newPath
 					}
 				}
+
 				result.ServiceNameToServices[*kongStateService.Service.Name] = *kongStateService
 				objectSuccessfullyParsed = true
 			}

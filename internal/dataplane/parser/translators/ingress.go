@@ -21,12 +21,8 @@ import (
 // TranslateIngress receives a Kubernetes ingress object and from it will
 // produce a translated set of kong.Services and kong.Routes which will come
 // wrapped in a kongstate.Service object.
-func TranslateIngress(ingress *netv1.Ingress, addRegexPrefix bool) []*kongstate.Service {
-	index := &ingressTranslationIndex{
-		cache:          make(map[string]*ingressTranslationMeta),
-		addRegexPrefix: addRegexPrefix,
-	}
-	index.add(ingress)
+func TranslateIngress(ingress *netv1.Ingress, index *IngressTranslationIndex, addRegexPrefix bool) []*kongstate.Service {
+	index.add(ingress, addRegexPrefix)
 	kongStateServices := kongstate.Services(index.translate())
 	sort.Sort(kongStateServices)
 	return kongStateServices
@@ -53,7 +49,7 @@ const (
 // Ingress Translation - Private - Index
 // -----------------------------------------------------------------------------
 
-// ingressTranslationIndex is a de-duplicating index of the contents of a
+// IngressTranslationIndex is a de-duplicating index of the contents of a
 // Kubernetes Ingress resource, where the key is a combination of data from
 // that resource which makes it unique for the purpose of translating it into
 // kong.Services and kong.Routes and the value is a combination of various
@@ -74,12 +70,17 @@ const (
 //
 // The addRegexPrefix flag indicates if generated regex paths for path type handling include the Kong 3.0+ "~" regular
 // expression prefix.
-type ingressTranslationIndex struct {
-	cache          map[string]*ingressTranslationMeta
-	addRegexPrefix bool
+type IngressTranslationIndex struct {
+	cache map[string]*ingressTranslationMeta
 }
 
-func (i *ingressTranslationIndex) add(ingress *netv1.Ingress) {
+func NewIngressTranslationIndex() *IngressTranslationIndex {
+	return &IngressTranslationIndex{
+		cache: make(map[string]*ingressTranslationMeta),
+	}
+}
+
+func (i *IngressTranslationIndex) add(ingress *netv1.Ingress, addRegexPrefix bool) {
 	for _, ingressRule := range ingress.Spec.Rules {
 		if ingressRule.HTTP == nil || len(ingressRule.HTTP.Paths) < 1 {
 			continue
@@ -106,7 +107,7 @@ func (i *ingressTranslationIndex) add(ingress *netv1.Ingress) {
 					ingressHost:    ingressRule.Host,
 					serviceName:    serviceName,
 					servicePort:    port,
-					addRegexPrefix: i.addRegexPrefix,
+					addRegexPrefix: addRegexPrefix,
 				}
 			}
 
@@ -117,10 +118,17 @@ func (i *ingressTranslationIndex) add(ingress *netv1.Ingress) {
 	}
 }
 
-func (i *ingressTranslationIndex) translate() []*kongstate.Service {
+func portName(port kongstate.PortDef) string {
+	if port.Name != "" {
+		return fmt.Sprintf("pname-%s", port.Name)
+	}
+	return fmt.Sprintf("pnum-%d", port.Number)
+}
+
+func (i *IngressTranslationIndex) translate() []*kongstate.Service {
 	kongStateServiceCache := make(map[string]*kongstate.Service)
 	for _, meta := range i.cache {
-		kongServiceName := fmt.Sprintf("%s.%s.%s.%s", meta.parentIngress.GetNamespace(), meta.parentIngress.GetName(), meta.serviceName, meta.servicePort.CanonicalString())
+		kongServiceName := fmt.Sprintf("%s.%s.%s", meta.parentIngress.GetNamespace(), meta.serviceName, portName(meta.servicePort))
 		kongStateService, ok := kongStateServiceCache[kongServiceName]
 		if !ok {
 			kongStateService = meta.translateIntoKongStateService(kongServiceName, meta.servicePort)
