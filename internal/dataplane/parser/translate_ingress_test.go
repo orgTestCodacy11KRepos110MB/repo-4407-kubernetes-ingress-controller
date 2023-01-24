@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -981,6 +982,9 @@ func TestFromIngressV1_MultipleIngressesUsingTheSameService(t *testing.T) {
 	require.NotNil(t, kongService)
 
 	assert.Len(t, kongService.Routes, 2)
+	sort.SliceStable(kongService.Routes, func(i, j int) bool {
+		return *kongService.Routes[i].Name < *kongService.Routes[j].Name
+	})
 	route1 := kongService.Routes[0]
 	assert.Equal(t, "namespace.ingress-1.foo-svc..http", *route1.Name)
 	assert.Equal(t, "ingress-1", route1.Ingress.Name)
