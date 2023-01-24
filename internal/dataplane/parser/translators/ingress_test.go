@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/kong/go-kong/kong"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -1240,7 +1241,8 @@ func TestTranslateIngress(t *testing.T) {
 					ObjectMeta: i.ObjectMeta,
 				}
 			})
-			diff := cmp.Diff(tt.expected, TranslateIngress(tt.ingress, index, tt.addRegexPrefix), checkOnlyObjectMeta)
+			noop := func(s string) *string { return lo.ToPtr(s) }
+			diff := cmp.Diff(tt.expected, TranslateIngress(tt.ingress, index, noop, tt.addRegexPrefix), checkOnlyObjectMeta)
 			require.Empty(t, diff, "expected no difference between expected and translated ingress")
 		})
 	}

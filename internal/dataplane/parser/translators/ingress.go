@@ -21,9 +21,9 @@ import (
 // TranslateIngress receives a Kubernetes ingress object and from it will
 // produce a translated set of kong.Services and kong.Routes which will come
 // wrapped in a kongstate.Service object.
-func TranslateIngress(ingress *netv1.Ingress, index *IngressTranslationIndex, addRegexPrefix bool) []*kongstate.Service {
+func TranslateIngress(ingress *netv1.Ingress, index *IngressTranslationIndex, addRegexPrefix func(string) *string, flagEnabledRegexPathPrefix bool) []*kongstate.Service {
 	index.add(ingress, addRegexPrefix)
-	kongStateServices := kongstate.Services(index.translate())
+	kongStateServices := kongstate.Services(index.translate(flagEnabledRegexPathPrefix))
 	sort.Sort(kongStateServices)
 	return kongStateServices
 }
@@ -80,7 +80,7 @@ func NewIngressTranslationIndex() *IngressTranslationIndex {
 	}
 }
 
-func (i *IngressTranslationIndex) add(ingress *netv1.Ingress, addRegexPrefix bool) {
+func (i *IngressTranslationIndex) add(ingress *netv1.Ingress, addRegexPrefix func(string) *string) {
 	for _, ingressRule := range ingress.Spec.Rules {
 		if ingressRule.HTTP == nil || len(ingressRule.HTTP.Paths) < 1 {
 			continue
@@ -104,10 +104,10 @@ func (i *IngressTranslationIndex) add(ingress *netv1.Ingress, addRegexPrefix boo
 			meta, ok := i.cache[cacheKey]
 			if !ok {
 				meta = &ingressTranslationMeta{
-					ingressHost:    ingressRule.Host,
-					serviceName:    serviceName,
-					servicePort:    port,
-					addRegexPrefix: addRegexPrefix,
+					ingressHost:      ingressRule.Host,
+					serviceName:      serviceName,
+					servicePort:      port,
+					addRegexPrefixFn: addRegexPrefix,
 				}
 			}
 
@@ -125,7 +125,7 @@ func portName(port kongstate.PortDef) string {
 	return fmt.Sprintf("pnum-%d", port.Number)
 }
 
-func (i *IngressTranslationIndex) translate() []*kongstate.Service {
+func (i *IngressTranslationIndex) translate(flagEnabledRegexPathPrefix bool) []*kongstate.Service {
 	kongStateServiceCache := make(map[string]*kongstate.Service)
 	for _, meta := range i.cache {
 		kongServiceName := fmt.Sprintf("%s.%s.%s", meta.parentIngress.GetNamespace(), meta.serviceName, portName(meta.servicePort))
@@ -134,7 +134,7 @@ func (i *IngressTranslationIndex) translate() []*kongstate.Service {
 			kongStateService = meta.translateIntoKongStateService(kongServiceName, meta.servicePort)
 		}
 
-		route := meta.translateIntoKongRoutes()
+		route := meta.translateIntoKongRoutes(flagEnabledRegexPathPrefix)
 		kongStateService.Routes = append(kongStateService.Routes, *route)
 
 		kongStateServiceCache[kongServiceName] = kongStateService
@@ -153,12 +153,12 @@ func (i *IngressTranslationIndex) translate() []*kongstate.Service {
 // -----------------------------------------------------------------------------
 
 type ingressTranslationMeta struct {
-	parentIngress  client.Object
-	ingressHost    string
-	serviceName    string
-	servicePort    kongstate.PortDef
-	paths          []netv1.HTTPIngressPath
-	addRegexPrefix bool
+	parentIngress    client.Object
+	ingressHost      string
+	serviceName      string
+	servicePort      kongstate.PortDef
+	paths            []netv1.HTTPIngressPath
+	addRegexPrefixFn func(string) *string
 }
 
 func (m *ingressTranslationMeta) translateIntoKongStateService(kongServiceName string, portDef kongstate.PortDef) *kongstate.Service {
@@ -184,7 +184,7 @@ func (m *ingressTranslationMeta) translateIntoKongStateService(kongServiceName s
 	}
 }
 
-func (m *ingressTranslationMeta) translateIntoKongRoutes() *kongstate.Route {
+func (m *ingressTranslationMeta) translateIntoKongRoutes(flagEnabledRegexPathPrefix bool) *kongstate.Route {
 	ingressHost := m.ingressHost
 	if strings.Contains(ingressHost, "*") {
 		// '_' is not allowed in host, so we use '_' to replace '*' since '*' is not allowed in Kong.
@@ -213,7 +213,10 @@ func (m *ingressTranslationMeta) translateIntoKongRoutes() *kongstate.Route {
 	}
 
 	for _, httpIngressPath := range m.paths {
-		paths := PathsFromIngressPaths(httpIngressPath, m.addRegexPrefix)
+		paths := PathsFromIngressPaths(httpIngressPath, flagEnabledRegexPathPrefix)
+		for i, path := range paths {
+			paths[i] = m.addRegexPrefixFn(*path)
+		}
 		route.Paths = append(route.Paths, paths...)
 	}
 

@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/kong/go-kong/kong"
+	"github.com/samber/lo"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
 
@@ -206,6 +207,10 @@ func (p *Parser) ingressRulesFromIngressV1() ingressRules {
 		if prefix, ok := ingress.ObjectMeta.Annotations[annotations.AnnotationPrefix+annotations.RegexPrefixKey]; ok {
 			regexPrefix = prefix
 		}
+		prependRegexPrefixFunc := func(path string) *string {
+			return lo.ToPtr(maybePrependRegexPrefix(path, regexPrefix, icp.EnableLegacyRegexDetection && p.flagEnabledRegexPathPrefix))
+		}
+
 		ingressSpec := ingress.Spec
 
 		if ingressSpec.DefaultBackend != nil {
@@ -217,14 +222,7 @@ func (p *Parser) ingressRulesFromIngressV1() ingressRules {
 		var objectSuccessfullyParsed bool
 
 		if p.featureEnabledCombinedServiceRoutes {
-			for _, kongStateService := range translators.TranslateIngress(ingress, index, p.flagEnabledRegexPathPrefix) {
-				for _, route := range kongStateService.Routes {
-					for i, path := range route.Paths {
-						newPath := maybePrependRegexPrefix(*path, regexPrefix, icp.EnableLegacyRegexDetection && p.flagEnabledRegexPathPrefix)
-						route.Paths[i] = &newPath
-					}
-				}
-
+			for _, kongStateService := range translators.TranslateIngress(ingress, index, prependRegexPrefixFunc, p.flagEnabledRegexPathPrefix) {
 				result.ServiceNameToServices[*kongStateService.Service.Name] = *kongStateService
 				objectSuccessfullyParsed = true
 			}
@@ -249,8 +247,7 @@ func (p *Parser) ingressRulesFromIngressV1() ingressRules {
 					}
 
 					for i, path := range paths {
-						newPath := maybePrependRegexPrefix(*path, regexPrefix, icp.EnableLegacyRegexDetection && p.flagEnabledRegexPathPrefix)
-						paths[i] = &newPath
+						paths[i] = prependRegexPrefixFunc(*path)
 					}
 
 					r := kongstate.Route{
