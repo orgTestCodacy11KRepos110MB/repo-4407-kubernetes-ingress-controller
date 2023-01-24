@@ -69,7 +69,7 @@ func TestTranslateIngress(t *testing.T) {
 			expected: []*kongstate.Service{{
 				Namespace: corev1.NamespaceDefault,
 				Service: kong.Service{
-					Name:           kong.String("default.test-service.80"),
+					Name:           kong.String("default.test-service.pnum-80"),
 					Host:           kong.String("test-service.default.80.svc"),
 					ConnectTimeout: kong.Int(int(defaultServiceTimeout.Milliseconds())),
 					Path:           kong.String("/"),
@@ -139,7 +139,7 @@ func TestTranslateIngress(t *testing.T) {
 			expected: []*kongstate.Service{{
 				Namespace: corev1.NamespaceDefault,
 				Service: kong.Service{
-					Name:           kong.String("default.test-service.80"),
+					Name:           kong.String("default.test-service.pnum-80"),
 					Host:           kong.String("test-service.default.80.svc"),
 					ConnectTimeout: kong.Int(int(defaultServiceTimeout.Milliseconds())),
 					Path:           kong.String("/"),
@@ -210,7 +210,7 @@ func TestTranslateIngress(t *testing.T) {
 			expected: []*kongstate.Service{{
 				Namespace: corev1.NamespaceDefault,
 				Service: kong.Service{
-					Name:           kong.String("default.test-service.80"),
+					Name:           kong.String("default.test-service.pnum-80"),
 					Host:           kong.String("test-service.default.80.svc"),
 					ConnectTimeout: kong.Int(int(defaultServiceTimeout.Milliseconds())),
 					Path:           kong.String("/"),
@@ -281,7 +281,7 @@ func TestTranslateIngress(t *testing.T) {
 			expected: []*kongstate.Service{{
 				Namespace: corev1.NamespaceDefault,
 				Service: kong.Service{
-					Name:           kong.String("default.test-service.80"),
+					Name:           kong.String("default.test-service.pnum-80"),
 					Host:           kong.String("test-service.default.80.svc"),
 					ConnectTimeout: kong.Int(int(defaultServiceTimeout.Milliseconds())),
 					Path:           kong.String("/"),
@@ -352,7 +352,7 @@ func TestTranslateIngress(t *testing.T) {
 			expected: []*kongstate.Service{{
 				Namespace: corev1.NamespaceDefault,
 				Service: kong.Service{
-					Name:           kong.String("default.test-service.80"),
+					Name:           kong.String("default.test-service.pnum-80"),
 					Host:           kong.String("test-service.default.80.svc"),
 					ConnectTimeout: kong.Int(int(defaultServiceTimeout.Milliseconds())),
 					Path:           kong.String("/"),
@@ -422,7 +422,7 @@ func TestTranslateIngress(t *testing.T) {
 			expected: []*kongstate.Service{{
 				Namespace: corev1.NamespaceDefault,
 				Service: kong.Service{
-					Name:           kong.String("default.test-service.80"),
+					Name:           kong.String("default.test-service.pnum-80"),
 					Host:           kong.String("test-service.default.80.svc"),
 					ConnectTimeout: kong.Int(int(defaultServiceTimeout.Milliseconds())),
 					Path:           kong.String("/"),
@@ -492,7 +492,7 @@ func TestTranslateIngress(t *testing.T) {
 			expected: []*kongstate.Service{{
 				Namespace: corev1.NamespaceDefault,
 				Service: kong.Service{
-					Name:           kong.String("default.test-service.80"),
+					Name:           kong.String("default.test-service.pnum-80"),
 					Host:           kong.String("test-service.default.80.svc"),
 					ConnectTimeout: kong.Int(int(defaultServiceTimeout.Milliseconds())),
 					Path:           kong.String("/"),
@@ -627,7 +627,7 @@ func TestTranslateIngress(t *testing.T) {
 			expected: []*kongstate.Service{{
 				Namespace: corev1.NamespaceDefault,
 				Service: kong.Service{
-					Name:           kong.String("default.test-service.80"),
+					Name:           kong.String("default.test-service.pnum-80"),
 					Host:           kong.String("test-service.default.80.svc"),
 					ConnectTimeout: kong.Int(int(defaultServiceTimeout.Milliseconds())),
 					Path:           kong.String("/"),
@@ -768,7 +768,7 @@ func TestTranslateIngress(t *testing.T) {
 			expected: []*kongstate.Service{{
 				Namespace: corev1.NamespaceDefault,
 				Service: kong.Service{
-					Name:           kong.String("default.test-service.80"),
+					Name:           kong.String("default.test-service.pnum-80"),
 					Host:           kong.String("test-service.default.80.svc"),
 					ConnectTimeout: kong.Int(int(defaultServiceTimeout.Milliseconds())),
 					Path:           kong.String("/"),
@@ -859,7 +859,7 @@ func TestTranslateIngress(t *testing.T) {
 				{
 					Namespace: corev1.NamespaceDefault,
 					Service: kong.Service{
-						Name:           kong.String("default.test-service1.80"),
+						Name:           kong.String("default.test-service1.pnum-80"),
 						Host:           kong.String("test-service1.default.80.svc"),
 						ConnectTimeout: kong.Int(int(defaultServiceTimeout.Milliseconds())),
 						Path:           kong.String("/"),
@@ -901,7 +901,7 @@ func TestTranslateIngress(t *testing.T) {
 				{
 					Namespace: corev1.NamespaceDefault,
 					Service: kong.Service{
-						Name:           kong.String("default.test-service2.80"),
+						Name:           kong.String("default.test-service2.pnum-80"),
 						Host:           kong.String("test-service2.default.80.svc"),
 						ConnectTimeout: kong.Int(int(defaultServiceTimeout.Milliseconds())),
 						Path:           kong.String("/"),
@@ -1000,7 +1000,7 @@ func TestTranslateIngress(t *testing.T) {
 				{
 					Namespace: corev1.NamespaceDefault,
 					Service: kong.Service{
-						Name:           kong.String("default.ad-service.80"),
+						Name:           kong.String("default.ad-service.pnum-80"),
 						Host:           kong.String("ad-service.default.80.svc"),
 						ConnectTimeout: kong.Int(int(defaultServiceTimeout.Milliseconds())),
 						Path:           kong.String("/"),
@@ -1042,7 +1042,7 @@ func TestTranslateIngress(t *testing.T) {
 				{
 					Namespace: corev1.NamespaceDefault,
 					Service: kong.Service{
-						Name:           kong.String("default.mad-service.80"),
+						Name:           kong.String("default.mad-service.pnum-80"),
 						Host:           kong.String("mad-service.default.80.svc"),
 						ConnectTimeout: kong.Int(int(defaultServiceTimeout.Milliseconds())),
 						Path:           kong.String("/"),
@@ -1115,7 +1115,7 @@ func TestTranslateIngress(t *testing.T) {
 			expected: []*kongstate.Service{{
 				Namespace: corev1.NamespaceDefault,
 				Service: kong.Service{
-					Name:           kong.String("default.test-service.80"),
+					Name:           kong.String("default.test-service.pnum-80"),
 					Host:           kong.String("test-service.default.80.svc"),
 					ConnectTimeout: kong.Int(int(defaultServiceTimeout.Milliseconds())),
 					Path:           kong.String("/"),
@@ -1188,7 +1188,7 @@ func TestTranslateIngress(t *testing.T) {
 			expected: []*kongstate.Service{{
 				Namespace: corev1.NamespaceDefault,
 				Service: kong.Service{
-					Name:           kong.String("default.test-service.http"),
+					Name:           kong.String("default.test-service.pname-http"),
 					Host:           kong.String("test-service.default.http.svc"),
 					ConnectTimeout: kong.Int(int(defaultServiceTimeout.Milliseconds())),
 					Path:           kong.String("/"),
