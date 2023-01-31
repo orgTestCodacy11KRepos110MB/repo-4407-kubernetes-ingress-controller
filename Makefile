@@ -290,6 +290,7 @@ test.conformance: gotestsum
 	@./scripts/check-container-environment.sh; \
 	for number in $(numbers) ; do \
         echo $$number ; \
+		go clean -testcache ; \
 		TEST_DATABASE_MODE="off" GOFLAGS="-tags=conformance_tests" \
 		GOTESTSUM_FORMAT=$(GOTESTSUM_FORMAT) \
 		go test -race \
