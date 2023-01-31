@@ -283,7 +283,7 @@ test: test.unit
 .PHONY: test.all
 test.all: test.unit test.integration test.conformance
 
-numbers = $(shell seq 1 20)
+numbers = $(shell seq 1 100)
 
 .PHONY: test.conformance
 test.conformance: gotestsum
