@@ -283,7 +283,7 @@ test: test.unit
 .PHONY: test.all
 test.all: test.unit test.integration test.conformance
 
-numbers = $(shell seq 1 2)
+numbers = $(shell seq 1 500)
 
 .PHONY: test.conformance
 test.conformance: gotestsum
@@ -293,7 +293,7 @@ test.conformance: gotestsum
 		go clean -testcache ; \
 		TEST_DATABASE_MODE="off" GOFLAGS="-tags=conformance_tests" \
 		GOTESTSUM_FORMAT=$(GOTESTSUM_FORMAT) \
-		$(GOTESTSUM) -- -race \
+		go test -race \
 			-timeout $(INTEGRATION_TEST_TIMEOUT) \
 			-parallel $(NCPU) \
 			./test/conformance ; \
